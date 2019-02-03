@@ -1,0 +1,16 @@
+extends layout
+
+block content
+  p hi, #{username} [
+    a(href= '/logout') logout
+    |]
+  p Click a paper to start!
+  each questions in questionslist
+    p= questions.name
+      |&nbsp;[
+      a(href= '/answers/questions/' + questions._id) View Attempts
+      |]
+    a(href= '/questions/' + questions._id)
+      img(src= questions.thumbnail)
+    br
+    

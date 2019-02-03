@@ -1,0 +1,270 @@
+extends layout
+
+block content
+  p hi, #{username} [
+    a(href= '/answers') back to marking list
+    |] [
+    a(href='/logout') logout
+    |]
+  if !error
+    p Page #{page} of #{total_pages} &nbsp; accumulated marks: #{accumulated_marks}
+    button#btn_pen write
+      i.material-icons.enb#pen_marking edit
+    button#btn_eraser erase
+      i.material-icons.disb#eraser_marking crop_square
+    form(action= form_action, method="post")
+      input(name='total_pages' type='hidden', value=total_pages)
+      input(name='total_marks' type='hidden', value=total_marks)
+      input(name='accumulated_marks' type='hidden', value=accumulated_marks)
+      button#btn_submit(type="submit") submit
+        i.material-icons cloud_upload
+      label(for='interim_marks') marks for this page  
+      input(type='number', min='0', value='0', step='0.5', name='interim_marks', id='interim_marks')  
+      input#canvas_marking(type="hidden", name="canvas_marking")
+    br
+    div(style="position: absolute; z-index: 1")
+      img#question(src= img_src_qn, width="100%", height="100%")
+    div(style="position: absolute; z-index: 2")
+      img#answer(src= img_src_ans, width="100%", height="100%")
+    canvas.pen#marking(style = 'border: 1px solid black; position: absolute; z-index: 3;')
+  script.
+    var paint
+    var clickX = new Array()
+    var clickY = new Array()
+    var clickXpercent = new Array()
+    var clickYpercent = new Array()
+    var clickDrag = new Array()
+    var clickColor = new Array()
+    var eraser = false
+    var pen = true
+    function init() {
+      resizeCanvas()
+      document.getElementById('marking').addEventListener('mousedown', savecoord)
+      document.getElementById('marking').addEventListener('mousemove', savecoord)
+      document.getElementById('marking').addEventListener('mouseup', stopdraw)
+      document.getElementById('marking').addEventListener('mouseleave', stopdraw)
+      document.getElementById('marking').addEventListener('touchstart', savecoord)
+      document.getElementById('marking').addEventListener('touchmove', savecoord)
+      document.getElementById('marking').addEventListener('touchend', stopdraw)
+      document.getElementById('btn_pen').addEventListener('click', toggletool)
+      document.getElementById('btn_eraser').addEventListener('click', toggletool)
+      document.getElementById('btn_submit').addEventListener('click', submit)
+    }
+    function resizeCanvas() {
+      var question = document.getElementById('question')
+      var question_width = question.width
+      var question_height = question.height
+      console.log('question_width ' + question_width)
+      console.log('question_height ' + question_height)
+      console.log('question natural width ' + question.naturalWidth)
+      console.log('question natural height ' + question.naturalHeight)
+      console.log('padding ' + question.style.padding)
+      console.log('border ' + question.style.border)
+      console.log('margin ' + question.style.margin)
+      var question_rect = question.getBoundingClientRect()
+      console.log('left ' + question_rect.left)
+      console.log('top ' + question_rect.top)
+      var marking = document.getElementById('marking')
+      marking.style.left = question_rect.left + 'px'
+      marking.width = question_width
+      marking.height = question_height
+      console.log('marking_width ' + marking.width)
+      console.log('marking_height ' + marking.height)
+      console.log('marking.style.left ' + marking.style.left)
+      redraw()
+    }
+    function redraw() {
+      console.log('redraw')
+      var marking_context = document.getElementById('marking').getContext('2d')
+      marking_context.clearRect(0, 0, marking_context.canvas.width, marking_context.canvas.height)
+      marking_context.lineJoin = 'round'
+      
+      for (var i = 0; i < clickX.length; i++) {
+        if (clickColor[i] == 'transparent') {
+          marking_context.lineWidth = 5
+          marking_context.globalCompositeOperation = 'destination-out'
+          marking_context.strokeStyle = 'rgba(0,0,0,1)'
+        } else {
+          marking_context.lineWidth = 2
+          marking_context.globalCompositeOperation = 'source-over'
+          marking_context.strokeStyle = clickColor[i]
+        }
+        marking_context.beginPath()
+        if (clickDrag[i] && i) {
+          var x = clickXpercent[i-1] * marking_context.canvas.width
+          var y = clickYpercent[i-1] * marking_context.canvas.height
+          //marking_context.moveTo(clickX[i-1], clickY[i-1])
+          marking_context.moveTo(x, y)
+        } else {
+          var x = clickXpercent[i] * marking_context.canvas.width
+          var y = clickYpercent[i] * marking_context.canvas.height
+          //marking_context.moveTo(clickX[i], clickY[i])
+          marking_context.moveTo(x, y)
+        }
+        var x = clickXpercent[i] * marking_context.canvas.width
+        var y = clickYpercent[i] * marking_context.canvas.height
+        //marking_context.lineTo(clickX[i], clickY[i])
+        marking_context.lineTo(x, y)
+        marking_context.stroke()
+      }
+    }
+    function savecoord(event) {
+      console.log("event " + event.type)
+      var marking = document.getElementById('marking')
+      console.log('offsetLeft ' + marking.offsetLeft)
+      console.log('offsetTop ' + marking.offsetTop)
+      //mouse events (laptop/desktop)
+      if (event.type == 'mousedown' || event.type == 'mousemove') {
+        console.log('pageX ' + event.pageX)
+        console.log('pageY ' + event.pageY)
+        var mouseX = event.pageX - marking.offsetLeft
+        var mouseY = event.pageY - marking.offsetTop
+        var mouseXpercent = mouseX / marking.width
+        var mouseYpercent = mouseY / marking.height
+        console.log('mouseX ' + mouseX)
+        console.log('mouseY ' + mouseY)
+        if (event.type == 'mousedown') {
+          paint = true
+          clickX.push(mouseX)
+          clickY.push(mouseY)
+          clickXpercent.push(mouseXpercent)
+          clickYpercent.push(mouseYpercent)
+          clickDrag.push(false)
+          if(pen) {
+            clickColor.push('#ff0000')
+          } else {
+            clickColor.push('transparent')
+          }
+          redraw()
+        }
+        if (event.type == 'mousemove') {
+          if (paint) {
+            clickX.push(mouseX)
+            clickY.push(mouseY)
+            clickXpercent.push(mouseXpercent)
+            clickYpercent.push(mouseYpercent)
+            clickDrag.push(true)
+            if(pen) {
+              clickColor.push('#ff0000')
+            } else {
+              clickColor.push('transparent')
+            }
+            redraw()
+          }
+        }
+      }
+      //touchscreen devices (smartphone, tablet)
+      if(event.type == 'touchstart') {
+        var targetTouches = event.targetTouches
+        var changedTouches = event.changedTouches
+        if (targetTouches.length == 1 && changedTouches.length == 1) {
+          //event.preventDefault()
+          paint = true
+          console.log('touchstart pageX is ' + targetTouches[0].pageX)
+          console.log('touchstart pageY is ' + targetTouches[0].pageY)
+          var touchX = targetTouches[0].pageX - marking.offsetLeft
+          var touchY = targetTouches[0].pageY - marking.offsetTop
+          console.log('touchstart touchX is ' + touchX)
+          console.log('touchstart touchY is ' + touchY)
+          var touchXpercent = touchX / marking.width
+          var touchYpercent = touchY / marking.height
+          console.log('touchstart touchXpercent is ' + touchXpercent)
+          console.log('touchstart touchYpercent is ' + touchYpercent)
+          clickX.push(touchX)
+          clickY.push(touchY)
+          clickXpercent.push(touchXpercent)
+          clickYpercent.push(touchYpercent)
+          clickDrag.push(false)
+          if(pen) {
+            clickColor.push('#ff0000')
+          } else {
+            clickColor.push('transparent')
+          }
+          redraw()
+        }
+      }
+      if(event.type == 'touchmove') {
+        if(paint) {
+          var targetTouches = event.targetTouches
+          var changedTouches = event.changedTouches
+          if (targetTouches.length == 1 && changedTouches.length == 1) {
+            //touchmoveCache.push(event)
+            event.preventDefault()
+            console.log('touchmove pageX is ' + targetTouches[0].pageX)
+            console.log('touchmove pageY is ' + targetTouches[0].pageY)
+            var touchX = targetTouches[0].pageX - marking.offsetLeft
+            var touchY = targetTouches[0].pageY - marking.offsetTop
+            console.log('touchmove touchX is ' + touchX)
+            console.log('touchmove touchY is ' + touchY)
+            var touchXpercent = touchX / marking.width
+            var touchYpercent = touchY / marking.height
+            console.log('touchmove touchXpercent is ' + touchXpercent)
+            console.log('touchmove touchYpercent is ' + touchYpercent)
+            clickX.push(touchX)
+            clickY.push(touchY)
+            clickXpercent.push(touchXpercent)
+            clickYpercent.push(touchYpercent)
+            clickDrag.push(true)
+            if(pen) {
+              clickColor.push('#ff0000')
+            } else {
+              clickColor.push('transparent')
+            }
+            redraw()
+          }
+        }
+      }
+    }
+    function stopdraw() {
+      paint = false
+    }
+    function toggletool(event) {
+      if (event.target.id == 'btn_pen') {
+        if (!pen & eraser) {
+          pen = !pen
+          eraser = !eraser
+        }
+      }
+      if (event.target.id == 'btn_eraser') {
+        if (pen & !eraser) {
+          pen = !pen
+          eraser = !eraser
+        }
+      }
+      console.log('pen is ' + pen)
+      console.log('eraser is ' + eraser)
+      if (pen) {
+        document.getElementById('pen_marking').classList.remove('disb')
+        document.getElementById('pen_marking').classList.add('enb')
+        document.getElementById('eraser_marking').classList.remove('enb')
+        document.getElementById('eraser_marking').classList.add('disb')
+        document.getElementById('marking').classList.remove('eraser')
+        document.getElementById('marking').classList.add('pen')
+      } else {
+        document.getElementById('pen_marking').classList.remove('enb')
+        document.getElementById('pen_marking').classList.add('disb')
+        document.getElementById('eraser_marking').classList.remove('disb')
+        document.getElementById('eraser_marking').classList.add('enb')
+        document.getElementById('marking').classList.remove('pen')
+        document.getElementById('marking').classList.add('eraser')
+      }
+    }
+    function submit() {
+      var marks = document.getElementById('interim_marks')
+      if (!marks.checkValidity()) {
+        return;
+      }
+      var question = document.getElementById('question')
+      var marking = document.getElementById('marking')
+      var cv = document.createElement('canvas')
+      cv.width = question.naturalWidth
+      cv.height = question.naturalHeight
+      var ctx = cv.getContext('2d')
+      ctx.drawImage(marking, 0, 0, marking.width, marking.height, 0, 0, cv.width, cv.height)
+      document.getElementById('canvas_marking').value = cv.toDataURL('image/png')
+      console.log("marking in base64 " + marking.toDataURL('image/png'))
+      var form = document.getElementsByTagName('form')
+      form[0].submit()
+    }
+    document.addEventListener('DOMContentLoaded', init)
+    window.addEventListener('resize', resizeCanvas)

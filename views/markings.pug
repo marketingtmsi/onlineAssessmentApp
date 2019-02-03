@@ -1,0 +1,14 @@
+extends layout
+
+block content
+  p hi, #{username} [
+    a(href= '/answers') back to marking list
+    |] [
+    a(href='/logout') logout
+    |]
+  each answers, index in answerslist
+    p #{index+1}: #{answers.qid.name}
+    p student: #{answers.username}, attempt: #{answers.attempt} score: #{answers.marks} / #{answers.qid.total_marks} status: #{answers.status} &nbsp;
+        a(href='/answers/'+ answers._id + '/questions/' + answers.qid._id + '/view') view
+    br
+  

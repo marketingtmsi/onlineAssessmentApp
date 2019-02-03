@@ -1,0 +1,21 @@
+extends layout
+
+block content
+  p= message
+  p hi, #{username} [
+    a(href='/questions') back to questions
+    |] [
+    a(href='/logout') logout
+    |]
+  p= name
+    each answers, index in answerslist
+      p View Attempt 
+        a(href='/answers/' + answers._id + '/questions/' + answers.qid + '/view')= answers.attempt
+        |&nbsp;(status: #{answers.status}
+        if answers.status != 'attempting' && answers.status != 'marking'
+          |, score: #{answers.marks} / #{total_marks}
+        |)
+      if answers.status == 'correcting'
+        a(href='/markings/answers/' + answers._id + '/questions/' + answers.qid) do corrections
+        
+    

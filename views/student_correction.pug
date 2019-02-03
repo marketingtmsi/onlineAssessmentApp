@@ -1,0 +1,267 @@
+extends layout
+
+block content
+  p hi, #{username} [
+    a(href= '/answers') back to marking list
+    |] [
+    a(href='/logout') logout
+    |]
+  p You can use two fingers to zoom in and out, and move left and right (for smartphones and tablets).
+  p Page #{page} of #{total_pages}
+  button#btn_pen write
+    i.material-icons.enb#pen_reviewing edit
+  button#btn_eraser erase
+    i.material-icons.disb#eraser_reviewing crop_square
+  form(action= form_action, method="post")
+    input(name='total_pages' type='hidden', value=total_pages)
+    button#btn_submit(type="submit") submit
+      i.material-icons cloud_upload 
+    input#canvas_reviewing(type="hidden", name="canvas_reviewing")
+  br
+  div(style="position: absolute; z-index: 1")
+    img#question(src= img_src_qn, width="100%", height="100%")
+  div(style="position: absolute; z-index: 2")
+    img#answer(src= img_src_ans, width="100%", height="100%")
+  div(style="position: absolute; z-index: 3")
+    img#marking(src= img_src_mark, width="100%", height="100%")
+  div(style="position: absolute; z-index: 4")
+    img#correction(src= img_src_crx, width="100%", height="100%")
+  canvas.pen#reviewing(style = 'border: 1px solid black; position: absolute; z-index: 5;')
+  script.
+    var paint
+    var clickX = new Array()
+    var clickY = new Array()
+    var clickXpercent = new Array()
+    var clickYpercent = new Array()
+    var clickDrag = new Array()
+    var clickColor = new Array()
+    var eraser = false
+    var pen = true
+    function init() {
+      resizeCanvas()
+      document.getElementById('reviewing').addEventListener('mousedown', savecoord)
+      document.getElementById('reviewing').addEventListener('mousemove', savecoord)
+      document.getElementById('reviewing').addEventListener('mouseup', stopdraw)
+      document.getElementById('reviewing').addEventListener('mouseleave', stopdraw)
+      document.getElementById('reviewing').addEventListener('touchstart', savecoord)
+      document.getElementById('reviewing').addEventListener('touchmove', savecoord)
+      document.getElementById('reviewing').addEventListener('touchend', stopdraw)
+      document.getElementById('btn_pen').addEventListener('click', toggletool)
+      document.getElementById('btn_eraser').addEventListener('click', toggletool)
+      document.getElementById('btn_submit').addEventListener('click', submit)
+    }
+    function resizeCanvas() {
+      var question = document.getElementById('question')
+      var question_width = question.width
+      var question_height = question.height
+      console.log('question_width ' + question_width)
+      console.log('question_height ' + question_height)
+      console.log('question natural width ' + question.naturalWidth)
+      console.log('question natural height ' + question.naturalHeight)
+      console.log('padding ' + question.style.padding)
+      console.log('border ' + question.style.border)
+      console.log('margin ' + question.style.margin)
+      var question_rect = question.getBoundingClientRect()
+      console.log('left ' + question_rect.left)
+      console.log('top ' + question_rect.top)
+      var reviewing = document.getElementById('reviewing')
+      reviewing.style.left = question_rect.left + 'px'
+      reviewing.width = question_width
+      reviewing.height = question_height
+      console.log('reviewing_width ' + reviewing.width)
+      console.log('reviewing_height ' + reviewing.height)
+      console.log('reviewing.style.left ' + reviewing.style.left)
+      redraw()
+    }
+    function redraw() {
+      console.log('redraw')
+      var review_context = document.getElementById('reviewing').getContext('2d')
+      review_context.clearRect(0, 0, review_context.canvas.width, review_context.canvas.height)
+      review_context.lineJoin = 'round'
+      
+      for (var i = 0; i < clickX.length; i++) {
+        if (clickColor[i] == 'transparent') {
+          review_context.lineWidth = 5
+          review_context.globalCompositeOperation = 'destination-out'
+          review_context.strokeStyle = 'rgba(0,0,0,1)'
+        } else {
+          review_context.lineWidth = 2
+          review_context.globalCompositeOperation = 'source-over'
+          review_context.strokeStyle = clickColor[i]
+        }
+        review_context.beginPath()
+        if (clickDrag[i] && i) {
+          var x = clickXpercent[i-1] * review_context.canvas.width
+          var y = clickYpercent[i-1] * review_context.canvas.height
+          //review_context.moveTo(clickX[i-1], clickY[i-1])
+          review_context.moveTo(x, y)
+        } else {
+          var x = clickXpercent[i] * review_context.canvas.width
+          var y = clickYpercent[i] * review_context.canvas.height
+          //review_context.moveTo(clickX[i], clickY[i])
+          review_context.moveTo(x, y)
+        }
+        var x = clickXpercent[i] * review_context.canvas.width
+        var y = clickYpercent[i] * review_context.canvas.height
+        //review_context.lineTo(clickX[i], clickY[i])
+        review_context.lineTo(x, y)
+        review_context.stroke()
+      }
+    }
+    function savecoord(event) {
+      console.log("event " + event.type)
+      var reviewing = document.getElementById('reviewing')
+      console.log('offsetLeft ' + reviewing.offsetLeft)
+      console.log('offsetTop ' + reviewing.offsetTop)
+      //mouse events (laptop/desktop)
+      if (event.type == 'mousedown' || event.type == 'mousemove') {
+        console.log('pageX ' + event.pageX)
+        console.log('pageY ' + event.pageY)
+        var mouseX = event.pageX - reviewing.offsetLeft
+        var mouseY = event.pageY - reviewing.offsetTop
+        var mouseXpercent = mouseX / reviewing.width
+        var mouseYpercent = mouseY / reviewing.height
+        console.log('mouseX ' + mouseX)
+        console.log('mouseY ' + mouseY)
+        if (event.type == 'mousedown') {
+          paint = true
+          clickX.push(mouseX)
+          clickY.push(mouseY)
+          clickXpercent.push(mouseXpercent)
+          clickYpercent.push(mouseYpercent)
+          clickDrag.push(false)
+          if(pen) {
+            clickColor.push('#ff00ff')
+          } else {
+            clickColor.push('transparent')
+          }
+          redraw()
+        }
+        if (event.type == 'mousemove') {
+          if (paint) {
+            clickX.push(mouseX)
+            clickY.push(mouseY)
+            clickXpercent.push(mouseXpercent)
+            clickYpercent.push(mouseYpercent)
+            clickDrag.push(true)
+            if(pen) {
+              clickColor.push('#ff00ff')
+            } else {
+              clickColor.push('transparent')
+            }
+            redraw()
+          }
+        }
+      }
+      //touchscreen devices (smartphone, tablet)
+      if(event.type == 'touchstart') {
+        var targetTouches = event.targetTouches
+        var changedTouches = event.changedTouches
+        if (targetTouches.length == 1 && changedTouches.length == 1) {
+          //event.preventDefault()
+          paint = true
+          console.log('touchstart pageX is ' + targetTouches[0].pageX)
+          console.log('touchstart pageY is ' + targetTouches[0].pageY)
+          var touchX = targetTouches[0].pageX - reviewing.offsetLeft
+          var touchY = targetTouches[0].pageY - reviewing.offsetTop
+          console.log('touchstart touchX is ' + touchX)
+          console.log('touchstart touchY is ' + touchY)
+          var touchXpercent = touchX / reviewing.width
+          var touchYpercent = touchY / reviewing.height
+          console.log('touchstart touchXpercent is ' + touchXpercent)
+          console.log('touchstart touchYpercent is ' + touchYpercent)
+          clickX.push(touchX)
+          clickY.push(touchY)
+          clickXpercent.push(touchXpercent)
+          clickYpercent.push(touchYpercent)
+          clickDrag.push(false)
+          if(pen) {
+            clickColor.push('#ff00ff')
+          } else {
+            clickColor.push('transparent')
+          }
+          redraw()
+        }
+      }
+      if(event.type == 'touchmove') {
+        if(paint) {
+          var targetTouches = event.targetTouches
+          var changedTouches = event.changedTouches
+          if (targetTouches.length == 1 && changedTouches.length == 1) {
+            //touchmoveCache.push(event)
+            event.preventDefault()
+            console.log('touchmove pageX is ' + targetTouches[0].pageX)
+            console.log('touchmove pageY is ' + targetTouches[0].pageY)
+            var touchX = targetTouches[0].pageX - reviewing.offsetLeft
+            var touchY = targetTouches[0].pageY - reviewing.offsetTop
+            console.log('touchmove touchX is ' + touchX)
+            console.log('touchmove touchY is ' + touchY)
+            var touchXpercent = touchX / reviewing.width
+            var touchYpercent = touchY / reviewing.height
+            console.log('touchmove touchXpercent is ' + touchXpercent)
+            console.log('touchmove touchYpercent is ' + touchYpercent)
+            clickX.push(touchX)
+            clickY.push(touchY)
+            clickXpercent.push(touchXpercent)
+            clickYpercent.push(touchYpercent)
+            clickDrag.push(true)
+            if(pen) {
+              clickColor.push('#ff00ff')
+            } else {
+              clickColor.push('transparent')
+            }
+            redraw()
+          }
+        }
+      }
+    }
+    function stopdraw() {
+      paint = false
+    }
+    function toggletool(event) {
+      if (event.target.id == 'btn_pen') {
+        if (!pen & eraser) {
+          pen = !pen
+          eraser = !eraser
+        }
+      }
+      if (event.target.id == 'btn_eraser') {
+        if (pen & !eraser) {
+          pen = !pen
+          eraser = !eraser
+        }
+      }
+      console.log('pen is ' + pen)
+      console.log('eraser is ' + eraser)
+      if (pen) {
+        document.getElementById('pen_reviewing').classList.remove('disb')
+        document.getElementById('pen_reviewing').classList.add('enb')
+        document.getElementById('eraser_reviewing').classList.remove('enb')
+        document.getElementById('eraser_reviewing').classList.add('disb')
+        document.getElementById('reviewing').classList.remove('eraser')
+        document.getElementById('reviewing').classList.add('pen')
+      } else {
+        document.getElementById('pen_reviewing').classList.remove('enb')
+        document.getElementById('pen_reviewing').classList.add('disb')
+        document.getElementById('eraser_reviewing').classList.remove('disb')
+        document.getElementById('eraser_reviewing').classList.add('enb')
+        document.getElementById('reviewing').classList.remove('pen')
+        document.getElementById('reviewing').classList.add('eraser')
+      }
+    }
+    function submit() {
+      var question = document.getElementById('question')
+      var current_canvas = document.getElementById('reviewing')
+      var cv = document.createElement('canvas')
+      cv.width = question.naturalWidth
+      cv.height = question.naturalHeight
+      var ctx = cv.getContext('2d')
+      ctx.drawImage(current_canvas, 0, 0, current_canvas.width, current_canvas.height, 0, 0, cv.width, cv.height)
+      console.log("cv in base64 " + cv.toDataURL('image/png'))
+      document.getElementById('canvas_reviewing').value = cv.toDataURL('image/png')
+      var form = document.getElementsByTagName('form')
+      form[0].submit()
+    }
+    document.addEventListener('DOMContentLoaded', init)
+    window.addEventListener('resize', resizeCanvas)
+    

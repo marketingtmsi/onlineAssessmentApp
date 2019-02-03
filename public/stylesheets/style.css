@@ -1,0 +1,103 @@
+body {
+  padding: 50px;
+  font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;
+}
+
+a {
+  color: #00B7FF;
+}
+
+#answer.pen {
+  cursor: url('../images/icon-pen-512.png'), pointer;
+}
+
+#marking.pen {
+  cursor: url('../images/icon-pen-red-512.png'), pointer;
+}
+
+#correcting.pen {
+  cursor: url('../images/icon-pen-green-512.png'), pointer;
+}
+
+#reviewing.pen {
+  cursor: url('../images/icon-pen-magenta-512.png'), pointer;
+}
+
+#answer.eraser {
+  cursor: url('../images/icon-eraser-512.png'), pointer;
+}
+
+#marking.eraser {
+  cursor: url('../images/icon-eraser-red-512.png'), pointer;
+}
+
+#correcting.eraser {
+  cursor: url('../images/icon-eraser-green-512.png'), pointer;
+}
+
+#reviewing.eraser {
+  cursor: url('../images/icon-eraser-magenta-512.png'), pointer;
+}
+
+#pen.enb {
+  color: #000000;
+}
+
+#pen_marking.enb {
+  color: #ff0000;
+}
+
+#pen_correcting.enb {
+  color: #00cc00;
+}
+
+#pen_reviewing.enb {
+  color: #ff00ff;
+}
+
+#pen.disb, #pen_marking.disb, #pen_correcting.disb, #pen_reviewing.disb {
+  color: #cccccc;
+}
+
+#eraser.enb {
+  color: #000000;
+}
+
+#eraser_marking.enb {
+  color: #ff0000;
+}
+
+#eraser_correcting.enb {
+  color: #00cc00;
+}
+
+#eraser_reviewing.enb {
+  color: #ff00ff;
+}
+
+#eraser.disb, #eraser_marking.disb, #eraser_correcting.disb, #eraser_reviewing.disb {
+  color: #cccccc;
+}
+
+form {
+  display: inline;  
+}
+
+body, canvas{
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  -o-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent
+}
+
+.hide {
+  display: none;
+}
+
+.show {
+  display: block;
+}

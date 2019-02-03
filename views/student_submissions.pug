@@ -1,0 +1,18 @@
+extends layout
+
+block content
+  p= message
+  p hi, #{username} [
+    a(href='/markings') view all markings
+    |] [
+    a(href='/logout') logout
+    |]
+  each submissions, index in submissionslist
+    if submissions.status == 'marking'
+      p #{index+1}: Marking #{submissions.qid.name} 
+    if submissions.status == 'reviewing'  
+      p #{index+1}: Reviewing #{submissions.qid.name}
+    if submissions.status == 'marking' || submissions.status == 'reviewing'  
+      p student: #{submissions.username} attempt: 
+        a(href='/answers/'+ submissions._id + '/questions/' + submissions.qid._id + '/' + submissions.status) #{submissions.attempt}
+    br

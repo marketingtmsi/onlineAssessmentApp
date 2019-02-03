@@ -1,0 +1,304 @@
+extends layout
+
+block content 
+  p= message
+  p hi, #{username} 
+    if page == 1  
+      |&nbsp;[
+      a(href= '/questions') back to questions
+      |]
+    else if page > 1
+      |&nbsp;[
+      a(href='javascript:void(null)' onclick="showPreviousQuestion()") show previous page below
+      |&nbsp;,&nbsp; 
+      a(href='javascript:void(null)' onclick="hidePreviousQuestion()") hide previous page
+      |]
+    |&nbsp;[
+    a(href= '/logout') logout
+    |]
+  p You can use two fingers to zoom in and out, and move left and right (for smartphones and tablets). You may need to use landscape position for iPhones.
+  if !error
+    p Page #{page} of #{total_pages}
+    button#btn_pen write
+      i.material-icons.enb#pen edit
+    button#btn_eraser erase
+      i.material-icons.disb#eraser crop_square
+    form(action= form_action, method="post")
+      input(name='total_pages' type='hidden', value=total_pages)
+      button#btn_submit(type="submit") submit
+        i.material-icons cloud_upload
+      input#canvas_answer(type="hidden", name="canvas_answer")
+    img#question(src= img_src width = "100%" height = "100%" style='z-index: 1;')
+    canvas.pen#answer(width = "2480" height = "3508" style = 'border: 1px solid black; position: absolute; z-index: 2;')
+  p
+  div(id="prev_qn" class="hide" style="border: 1px solid black; position: absolute; z-index: 3; margin-left:auto; margin-right:auto; width: 75%;")
+    img#view-prev-question(src= img_src_prev_qn, width="75%", height="75%")
+  div(id="prev_ans" class="hide" style="position: absolute; z-index: 4; margin-left:auto; margin-right:auto; width: 75%;")
+    img#view-prev-answer(src= img_src_prev_ans, width="75%", height="75%")
+  script.
+    var paint
+    var clickX = new Array()
+    var clickY = new Array()
+    var clickXpercent = new Array()
+    var clickYpercent = new Array()
+    var clickDrag = new Array()
+    var clickColor = new Array()
+    var eraser = false
+    var pen = true
+    var touchmoveCache = Array()
+    var allowedTime = 300
+    var startTime = 0
+    var startX = 0
+    var startY = 0
+    var thresholdX = 0.1
+    var thresholdY = 0.1
+    var restraintX = 0.075
+    var restraintY = 0.075
+    function showPreviousQuestion() {
+      var div_prev_qn = document.getElementById('prev_qn')
+      div_prev_qn.classList.remove('hide')
+      div_prev_qn.classList.add('show')
+      var div_prev_ans = document.getElementById('prev_ans')
+      div_prev_ans.classList.remove('hide')
+      div_prev_ans.classList.add('show')
+    }
+    function hidePreviousQuestion() {
+      var div_prev_qn = document.getElementById('prev_qn')
+      div_prev_qn.classList.remove('show')
+      div_prev_qn.classList.add('hide')
+      var div_prev_ans = document.getElementById('prev_ans')
+      div_prev_ans.classList.remove('show')
+      div_prev_ans.classList.add('hide')
+    }
+    function init() {
+      resizeCanvas()
+      document.getElementById('answer').addEventListener('mousedown', savecoord)
+      document.getElementById('answer').addEventListener('mousemove', savecoord)
+      document.getElementById('answer').addEventListener('mouseup', stopdraw)
+      document.getElementById('answer').addEventListener('mouseleave', stopdraw)
+      document.getElementById('answer').addEventListener('touchstart', savecoord)
+      document.getElementById('answer').addEventListener('touchmove', savecoord)
+      document.getElementById('answer').addEventListener('touchend', stopdraw)
+      document.getElementById('btn_pen').addEventListener('click', toggletool)
+      document.getElementById('btn_eraser').addEventListener('click', toggletool)
+      document.getElementById('btn_submit').addEventListener('click', submit)
+    }
+    function resizeCanvas() {
+      console.log('resizeCanvas')
+      var question = document.getElementById('question')
+      var question_width = question.width
+      var question_height = question.height
+      console.log('question_width ' + question_width)
+      console.log('question_height ' + question_height)
+      console.log('question natural width ' + question.naturalWidth)
+      console.log('question natural height ' + question.naturalHeight)
+      console.log('padding ' + question.style.padding)
+      console.log('border ' + question.style.border)
+      console.log('margin ' + question.style.margin)
+      var question_rect = question.getBoundingClientRect()
+      console.log('left ' + question_rect.left)
+      console.log('top ' + question_rect.top)
+      var answer = document.getElementById('answer')
+      answer.style.left = question_rect.left + 'px'
+      answer.width = question_width
+      answer.height = question_height
+      console.log('answer_width ' + answer.width)
+      console.log('answer_height ' + answer.height)
+      console.log('answer.style.left ' + answer.style.left)
+      redraw()
+    }
+    function redraw() {
+      console.log('redraw')
+      var answer_context = document.getElementById('answer').getContext('2d')
+      answer_context.clearRect(0, 0, answer_context.canvas.width, answer_context.canvas.height)
+      answer_context.lineJoin = 'round'
+      
+      for (var i = 0; i < clickX.length; i++) {
+        if (clickColor[i] == 'transparent') {
+          answer_context.lineWidth = 5
+          answer_context.globalCompositeOperation = 'destination-out'
+          answer_context.strokeStyle = 'rgba(0,0,0,1)'
+        } else {
+          answer_context.lineWidth = 2
+          answer_context.globalCompositeOperation = 'source-over'
+          answer_context.strokeStyle = clickColor[i]
+        }
+        answer_context.beginPath()
+        if (clickDrag[i] && i) {
+          var x = clickXpercent[i-1] * answer_context.canvas.width
+          var y = clickYpercent[i-1] * answer_context.canvas.height
+          //answer_context.moveTo(clickX[i-1], clickY[i-1])
+          answer_context.moveTo(x, y)
+        } else {
+          var x = clickXpercent[i] * answer_context.canvas.width
+          var y = clickYpercent[i] * answer_context.canvas.height
+          //answer_context.moveTo(clickX[i], clickY[i])
+          answer_context.moveTo(x, y)
+        }
+        var x = clickXpercent[i] * answer_context.canvas.width
+        var y = clickYpercent[i] * answer_context.canvas.height
+        //answer_context.lineTo(clickX[i], clickY[i])
+        answer_context.lineTo(x, y)
+        answer_context.stroke()
+      }
+    }
+    function savecoord(event) {
+      console.log("event " + event.type)
+      var answer = document.getElementById('answer')
+      console.log('offsetLeft ' + answer.offsetLeft)
+      console.log('offsetTop ' + answer.offsetTop)
+      //mouse events (laptop/desktop)
+      if (event.type == 'mousedown' || event.type == 'mousemove') {
+        console.log('pageX ' + event.pageX)
+        console.log('pageY ' + event.pageY)
+        var mouseX = event.pageX - answer.offsetLeft
+        var mouseY = event.pageY - answer.offsetTop
+        var mouseXpercent = mouseX / answer.width
+        var mouseYpercent = mouseY / answer.height
+        console.log('mouseX ' + mouseX)
+        console.log('mouseY ' + mouseY)
+        console.log('mouseXpercent ' + mouseXpercent)
+        console.log('mouseYpercent ' + mouseYpercent)
+        if (event.type == 'mousedown') {
+          paint = true
+          clickX.push(mouseX)
+          clickY.push(mouseY)
+          clickXpercent.push(mouseXpercent)
+          clickYpercent.push(mouseYpercent)
+          clickDrag.push(false)
+          if(pen) {
+            clickColor.push('#000000')
+          } else {
+            clickColor.push('transparent')
+          }
+          redraw()
+        }
+        if (event.type == 'mousemove') {
+          if (paint) {
+            clickX.push(mouseX)
+            clickY.push(mouseY)
+            clickXpercent.push(mouseXpercent)
+            clickYpercent.push(mouseYpercent)
+            clickDrag.push(true)
+            if(pen) {
+              clickColor.push('#000000')
+            } else {
+            clickColor.push('transparent')
+            }
+            redraw()
+          }
+        }
+      }
+      //touchscreen devices (smartphone, tablet)
+      if(event.type == 'touchstart') {
+        var targetTouches = event.targetTouches
+        var changedTouches = event.changedTouches
+        if (targetTouches.length == 1 && changedTouches.length == 1) {
+          //event.preventDefault()
+          //touchmoveCache.push(event)
+          paint = true
+          console.log('touchstart pageX is ' + targetTouches[0].pageX)
+          console.log('touchstart pageY is ' + targetTouches[0].pageY)
+          var touchX = targetTouches[0].pageX - answer.offsetLeft
+          var touchY = targetTouches[0].pageY - answer.offsetTop
+          console.log('touchstart touchX is ' + touchX)
+          console.log('touchstart touchY is ' + touchY)
+          var touchXpercent = touchX / answer.width
+          var touchYpercent = touchY / answer.height
+          console.log('touchstart touchXpercent is ' + touchXpercent)
+          console.log('touchstart touchYpercent is ' + touchYpercent)
+          clickX.push(touchX)
+          clickY.push(touchY)
+          clickXpercent.push(touchXpercent)
+          clickYpercent.push(touchYpercent)
+          clickDrag.push(false)
+          if(pen) {
+            clickColor.push('#000000')
+          } else {
+            clickColor.push('transparent')
+          }
+          redraw()
+        }
+      }
+      if(event.type == 'touchmove') {
+        if(paint) {
+          var targetTouches = event.targetTouches
+          var changedTouches = event.changedTouches
+          if (targetTouches.length == 1 && changedTouches.length == 1) {
+            //touchmoveCache.push(event)
+            event.preventDefault()
+            console.log('touchmove pageX is ' + targetTouches[0].pageX)
+            console.log('touchmove pageY is ' + targetTouches[0].pageY)
+            var touchX = targetTouches[0].pageX - answer.offsetLeft
+            var touchY = targetTouches[0].pageY - answer.offsetTop
+            console.log('touchmove touchX is ' + touchX)
+            console.log('touchmove touchY is ' + touchY)
+            var touchXpercent = touchX / answer.width
+            var touchYpercent = touchY / answer.height
+            console.log('touchmove touchXpercent is ' + touchXpercent)
+            console.log('touchmove touchYpercent is ' + touchYpercent)
+            clickX.push(touchX)
+            clickY.push(touchY)
+            clickXpercent.push(touchXpercent)
+            clickYpercent.push(touchYpercent)
+            clickDrag.push(true)
+            if(pen) {
+              clickColor.push('#000000')
+            } else {
+              clickColor.push('transparent')
+            }
+            redraw()
+          }
+        }
+      }
+    }
+    function stopdraw(event) {
+      paint = false
+      //touchmoveCache = new Array()
+    }
+    function toggletool(event) {
+      if (event.target.id == 'btn_pen') {
+        if (!pen & eraser) {
+          pen = !pen
+          eraser = !eraser
+        }
+      }
+      if (event.target.id == 'btn_eraser') {
+        if (pen & !eraser) {
+          pen = !pen
+          eraser = !eraser
+        }
+      }
+      console.log('pen is ' + pen)
+      console.log('eraser is ' + eraser)
+      if (pen) {
+        document.getElementById('pen').classList.remove('disb')
+        document.getElementById('pen').classList.add('enb')
+        document.getElementById('eraser').classList.remove('enb')
+        document.getElementById('eraser').classList.add('disb')
+        document.getElementById('answer').classList.remove('eraser')
+        document.getElementById('answer').classList.add('pen')
+      } else {
+        document.getElementById('pen').classList.remove('enb')
+        document.getElementById('pen').classList.add('disb')
+        document.getElementById('eraser').classList.remove('disb')
+        document.getElementById('eraser').classList.add('enb')
+        document.getElementById('answer').classList.remove('pen')
+        document.getElementById('answer').classList.add('eraser')
+      }
+    }
+    function submit() {
+      var question = document.getElementById('question')
+      var answer = document.getElementById('answer')
+      var cv = document.createElement('canvas')
+      cv.width = question.naturalWidth
+      cv.height = question.naturalHeight
+      var ctx = cv.getContext('2d')
+      ctx.drawImage(answer, 0, 0, answer.width, answer.height, 0, 0, cv.width, cv.height)
+      document.getElementById('canvas_answer').value = cv.toDataURL('image/png')
+      console.log("answer in base64 " + answer.toDataURL('image/png'))
+      var form = document.getElementsByTagName('form')
+      form[0].submit()
+    }
+    document.addEventListener('DOMContentLoaded', init)
+    window.addEventListener('resize', resizeCanvas)
